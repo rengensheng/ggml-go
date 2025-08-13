@@ -43,12 +43,11 @@ func main() {
 	}
 
 	// Perform addition
-	c := tensor.Add(context, a, b)
-
+	t := tensor.Add(context, a, b)
+	result := tensor.SoftMax(context, t)
 	// Create computation graph
 	graph := backend.NewGraph(context)
-	graph.BuildForwardExpand(c)
-
+	graph.BuildForwardExpand(result)
 	// Compute the graph
 	status := cpuBackend.GraphCompute(graph)
 	if status != lm.StatusSuccess {
@@ -59,6 +58,6 @@ func main() {
 	// Print results
 	fmt.Println("Result of addition:")
 	for i := 0; i < 10; i++ {
-		fmt.Printf("c[%d] = %.2f\n", i, c.GetF32(i))
+		fmt.Printf("c[%d] = %.2f\n", i, result.GetF32(i))
 	}
 }
