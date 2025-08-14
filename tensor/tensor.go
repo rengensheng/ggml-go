@@ -9,6 +9,9 @@ package tensor
 */
 import "C"
 import (
+	"fmt"
+	"io"
+	"os"
 	"unsafe"
 
 	"github.com/rengensheng/ggml-go/ctx"
@@ -48,6 +51,49 @@ func NewTensor4D(ctx *ctx.Context, typ lm.Type, ne0, ne1, ne2, ne3 int) *Tensor 
 	return &Tensor{ptr: cTensor}
 }
 
+func NewTensorI32(ctx *ctx.Context, val int32) *Tensor {
+	cCtx := (*C.struct_ggml_context)(ctx.Ptr())
+	cTensor := C.ggml_new_i32(cCtx, C.int32_t(val))
+	return &Tensor{ptr: cTensor}
+}
+
+func NewTensorF32(ctx *ctx.Context, val float32) *Tensor {
+	cCtx := (*C.struct_ggml_context)(ctx.Ptr())
+	cTensor := C.ggml_new_f32(cCtx, C.float(val))
+	return &Tensor{ptr: cTensor}
+}
+
+func (t *Tensor) GetNe(index int) int32 {
+	return int32(t.ptr.ne[index])
+}
+
+func (t *Tensor) NElements() int {
+	return int(C.ggml_nelements(t.ptr))
+}
+
+func (t *Tensor) NBytes() int {
+	return int(C.ggml_nbytes(t.ptr))
+}
+
+func (t *Tensor) DataPtr() unsafe.Pointer {
+	return t.ptr.data
+}
+
+func (t *Tensor) ReadTensorData(f *os.File) error {
+	dataPtr := t.DataPtr()
+	nBytes := t.NBytes()
+	fmt.Println("读取的字节数", nBytes)
+	buf := unsafe.Slice((*byte)(dataPtr), nBytes)
+	_, err := io.ReadFull(f, buf)
+	return err
+}
+
+func (t *Tensor) ToString() string {
+	nBytes := t.NBytes()
+	buf := unsafe.Slice((*byte)(t.DataPtr()), nBytes)
+	return string(buf)
+}
+
 // SetParam marks a tensor as a parameter
 func (t *Tensor) SetParam(ctx *ctx.Context) {
 	C.ggml_set_param(t.ptr)
@@ -63,10 +109,28 @@ func (t *Tensor) GetFlag(flag lm.TensorFlag) bool {
 	return (t.ptr.flags & C.int32_t(flag)) != 0
 }
 
+func (t *Tensor) Shape() []int64 {
+	dims := make([]int64, 4)
+	for i := 0; i < 4; i++ {
+		dims[i] = int64(t.ptr.ne[i]) // 或者 int32，看你要的精度
+	}
+	return dims
+}
+
+func (t *Tensor) Empty() bool {
+	return bool(C.ggml_is_empty(t.ptr))
+}
+
 // Add performs element-wise addition of two tensors
 func Add(ctx *ctx.Context, a, b *Tensor) *Tensor {
 	cCtx := (*C.struct_ggml_context)(ctx.Ptr())
 	cTensor := C.ggml_add(cCtx, a.ptr, b.ptr)
+	return &Tensor{ptr: cTensor}
+}
+
+func Add1(ctx *ctx.Context, a, b *Tensor) *Tensor {
+	cCtx := (*C.struct_ggml_context)(ctx.Ptr())
+	cTensor := C.ggml_add1(cCtx, a.ptr, b.ptr)
 	return &Tensor{ptr: cTensor}
 }
 
@@ -701,4 +765,8 @@ func (t *Tensor) GetData(data unsafe.Pointer, size int) {
 // Ptr returns the underlying C pointer
 func (t *Tensor) Ptr() unsafe.Pointer {
 	return unsafe.Pointer(t.ptr)
+}
+
+func (t *Tensor) SetZero() {
+	C.ggml_set_zero(t.ptr)
 }

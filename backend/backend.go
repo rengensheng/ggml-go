@@ -6,6 +6,7 @@ package backend
 #include "ggml.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#include "ggml-alloc.h"
 */
 import "C"
 import (
@@ -107,6 +108,12 @@ func (b *Backend) GraphComputeAsync(graph *Graph) lm.Status {
 	return lm.Status(cStatus)
 }
 
+func (b *Backend) BackendAllocCtxTensors(c *ctx.Context) Buffer {
+	var buf Buffer
+	buf.ptr = C.ggml_backend_alloc_ctx_tensors((*C.struct_ggml_context)(c.Ptr()), b.ptr)
+	return buf
+}
+
 // NewGraph creates a new computation graph
 func NewGraph(ctx *ctx.Context) *Graph {
 	cCtx := (*C.struct_ggml_context)(ctx.Ptr())
@@ -189,4 +196,19 @@ func (b *Buffer) Clear(value byte) {
 // IsHost checks if this is a host buffer
 func (b *Buffer) IsHost() bool {
 	return bool(C.ggml_backend_buffer_is_host(b.ptr))
+}
+
+type GAllocr struct {
+	ptr C.ggml_gallocr_t
+}
+
+func GallocrNew(b *BufferType) *GAllocr {
+	allocr := C.ggml_gallocr_new(b.ptr)
+	return &GAllocr{
+		ptr: allocr,
+	}
+}
+
+func (a *GAllocr) AllocGraph(graph *Graph) {
+	C.ggml_gallocr_alloc_graph(a.ptr, graph.ptr)
 }
